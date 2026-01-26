@@ -1,9 +1,11 @@
-import { MapContainer } from "./components/map";
+// import { MapRasterContainer } from "./components/raster";
+import { MapVideoContainer } from "./components/video";
 
 function App() {
   return (
     <div className="w-full h-full bg-amber-500">
-      <MapContainer />
+      {/* <MapRasterContainer /> */}
+      <MapVideoContainer />
     </div>
   );
 }

@@ -20,7 +20,7 @@ const INITIAL_VIEW_STATE: ViewState = {
   padding: { top: 0, bottom: 0, left: 0, right: 0 },
 };
 
-export const MapContainer = () => {
+export const MapRasterContainer = () => {
   const [frame, setFrame] = useState(0);
 
   useInterval(() => {
