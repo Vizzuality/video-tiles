@@ -22,7 +22,7 @@ const INITIAL_VIEW_STATE: ViewState = {
   padding: { top: 0, bottom: 0, left: 0, right: 0 },
 };
 
-const TOTAL_FRAMES = 11;
+const TOTAL_FRAMES = 60;
 
 type TileData = {
   decoder: FrameDecoder;
@@ -34,13 +34,13 @@ export const MapVideoContainer = () => {
 
   useInterval(() => {
     setFrame((prevFrame) => (prevFrame + 1) % TOTAL_FRAMES);
-  }, 500);
+  }, 100);
 
   const LAYERS = useMemo(() => {
     return [
       new TileLayer<TileData | undefined, { frame: number }>({
         id: "video-tiles",
-        data: "http://localhost:8000/video_tile/WebMercatorQuad/{z}/{x}/{y}.mp4?url=https://atlantis-vis-o.s3-ext.jc.rl.ac.uk/nemotest101/T1d/sos_abs.zarr&variable=sos_abs&sel_method=nearest&colormap_name=jet&rescale=30,37&sel=time_counter=2000-01-01&sel=time_counter=2000-01-02&sel=time_counter=2000-01-03&sel=time_counter=2000-01-04&sel=time_counter=2000-01-05&sel=time_counter=2000-01-06&sel=time_counter=2000-01-07&sel=time_counter=2000-01-08&sel=time_counter=2000-01-09&sel=time_counter=2000-01-10&sel=time_counter=2000-01-11",
+        data: "http://localhost:8000/video_tile/WebMercatorQuad/{z}/{x}/{y}.mp4?url=https://atlantis-vis-o.s3-ext.jc.rl.ac.uk/nemotest101/T1d/sos_abs.zarr&variable=sos_abs&sel_method=nearest&colormap_name=jet&rescale=30,37&sel=time_counter=2000-01-01&sel=time_counter=2000-01-02&sel=time_counter=2000-01-03&sel=time_counter=2000-01-04&sel=time_counter=2000-01-05&sel=time_counter=2000-01-06&sel=time_counter=2000-01-07&sel=time_counter=2000-01-08&sel=time_counter=2000-01-09&sel=time_counter=2000-01-10&sel=time_counter=2000-01-11&sel=time_counter=2000-01-12&sel=time_counter=2000-01-13&sel=time_counter=2000-01-14&sel=time_counter=2000-01-15&sel=time_counter=2000-01-16&sel=time_counter=2000-01-17&sel=time_counter=2000-01-18&sel=time_counter=2000-01-19&sel=time_counter=2000-01-20&sel=time_counter=2000-01-21&sel=time_counter=2000-01-22&sel=time_counter=2000-01-23&sel=time_counter=2000-01-24&sel=time_counter=2000-01-25&sel=time_counter=2000-01-26&sel=time_counter=2000-01-27&sel=time_counter=2000-01-28&sel=time_counter=2000-01-29&sel=time_counter=2000-01-30&sel=time_counter=2000-01-31&sel=time_counter=2000-02-01&sel=time_counter=2000-02-02&sel=time_counter=2000-02-03&sel=time_counter=2000-02-04&sel=time_counter=2000-02-05&sel=time_counter=2000-02-06&sel=time_counter=2000-02-07&sel=time_counter=2000-02-08&sel=time_counter=2000-02-09&sel=time_counter=2000-02-10&sel=time_counter=2000-02-11&sel=time_counter=2000-02-12&sel=time_counter=2000-02-13&sel=time_counter=2000-02-14&sel=time_counter=2000-02-15&sel=time_counter=2000-02-16&sel=time_counter=2000-02-17&sel=time_counter=2000-02-18&sel=time_counter=2000-02-19&sel=time_counter=2000-02-20&sel=time_counter=2000-02-21&sel=time_counter=2000-02-22&sel=time_counter=2000-02-23&sel=time_counter=2000-02-24&sel=time_counter=2000-02-25&sel=time_counter=2000-02-26&sel=time_counter=2000-02-27&sel=time_counter=2000-02-28&sel=time_counter=2000-02-29",
         tileSize: 256,
         minZoom: 0,
         maxZoom: 7,
@@ -48,7 +48,6 @@ export const MapVideoContainer = () => {
         getTileData: async (props) => {
           if (!props.url) return undefined;
 
-          console.log("Loading tile:", props.url);
           // const video = await load(props.url, VideoLoader);
           const frameDecoder = new FrameDecoder();
           await frameDecoder.init(props.url);
@@ -58,7 +57,6 @@ export const MapVideoContainer = () => {
           canvas.width = 256;
           canvas.height = 256;
 
-          console.log("Tile loaded, decoder ready");
           return { decoder: frameDecoder, canvas };
         },
 
@@ -74,27 +72,31 @@ export const MapVideoContainer = () => {
             return null;
           }
 
-          const { decoder, canvas } = tileData;
+          const { decoder } = tileData;
+
+          // Create a new canvas for this frame to get a new object reference
+          const canvas = document.createElement("canvas");
+          canvas.width = 256;
+          canvas.height = 256;
           const ctx = canvas.getContext("2d");
+
           if (!ctx) {
             console.log("No canvas context");
             return null;
           }
 
-          // Seek to the current frame position (0 to 1)
-          const fraction = typedProps.frame / (TOTAL_FRAMES - 1);
-          console.log(
-            "Rendering frame:",
+          // Draw the specific frame by index
+          const drawn = decoder.drawFrameByIndex(
             typedProps.frame,
-            "fraction:",
-            fraction,
-            "decoder:",
-            decoder,
+            ctx,
+            canvas.width,
+            canvas.height,
           );
-          decoder.seek(fraction);
 
-          // Draw the current video frame to the canvas
-          decoder.drawFrame(ctx, canvas.width, canvas.height);
+          if (!drawn) {
+            console.log("Failed to draw frame:", typedProps.frame);
+            return null;
+          }
 
           return new BitmapLayer({
             id: props.id,

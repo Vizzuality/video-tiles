@@ -38,27 +38,14 @@ export class FrameDecoder {
     width: number,
     height: number,
   ) {
-    console.log("drawFrame called", {
-      hasCanvas: !!this.canvas,
-      hasCtx: !!this.ctx,
-      bufferSize: this.frameBuffer.size,
-      currentTimestamp: this.currentTimestamp,
-    });
-
     if (!this.canvas || !this.ctx) return;
 
     if (this.frameBuffer.size === 0) {
-      console.log("No frames in buffer");
       return;
     }
 
     let minDiff = Infinity;
     let bestFrame: VideoFrame | null = null;
-
-    console.log(
-      "Frame buffer timestamps:",
-      Array.from(this.frameBuffer.keys()),
-    );
 
     for (const [timestamp, frame] of this.frameBuffer) {
       const diff = Math.abs(timestamp - this.currentTimestamp);
@@ -67,12 +54,6 @@ export class FrameDecoder {
         bestFrame = frame;
       }
     }
-
-    console.log("Best frame:", {
-      timestamp: bestFrame?.timestamp,
-      minDiff,
-      currentTimestamp: this.currentTimestamp,
-    });
 
     if (bestFrame && bestFrame.timestamp != this.lastDrawnTimestamp) {
       this.ctx.drawImage(
@@ -83,11 +64,45 @@ export class FrameDecoder {
         bestFrame.codedHeight,
       );
       this.lastDrawnTimestamp = bestFrame.timestamp;
-      console.log("Drew frame to OffscreenCanvas");
     }
 
     ctx.drawImage(this.canvas, 0, 0, width, height);
-    console.log("Copied to target canvas");
+  }
+
+  /**
+   * Draw a specific frame by index
+   * @param frameIndex - The index of the frame to draw (0-based)
+   * @param ctx - The canvas context to draw to
+   * @param width - The width to draw
+   * @param height - The height to draw
+   */
+  public drawFrameByIndex(
+    frameIndex: number,
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+  ): boolean {
+    if (!this.canvas || !this.ctx) return false;
+    if (this.frameBuffer.size === 0) return false;
+
+    // Get all frames sorted by timestamp
+    const frames = Array.from(this.frameBuffer.entries()).sort(
+      (a, b) => a[0] - b[0],
+    );
+
+    if (frameIndex < 0 || frameIndex >= frames.length) return false;
+
+    const [timestamp, frame] = frames[frameIndex];
+
+    // Draw to internal canvas
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    this.ctx.drawImage(frame, 0, 0, frame.codedWidth, frame.codedHeight);
+
+    // Draw to target canvas
+    ctx.drawImage(this.canvas, 0, 0, width, height);
+    this.lastDrawnTimestamp = timestamp;
+
+    return true;
   }
 
   /**
@@ -142,6 +157,7 @@ export class FrameDecoder {
 
   private async processQueue(): Promise<void> {
     try {
+      console.time("Seek processing time");
       this.seeking = true;
 
       while (this.seekQueue.length > 0) {
@@ -161,6 +177,7 @@ export class FrameDecoder {
       }
     } finally {
       this.seeking = false;
+      console.timeEnd("Seek processing time");
     }
   }
 
@@ -274,8 +291,16 @@ export class FrameDecoder {
   }
 
   private decodeChunks(startIndex: number, endIndex: number) {
-    for (let i = startIndex; i <= endIndex; i++) {
-      // clamp the index to the valid range
+    // Ensure we start from a keyframe
+    let actualStartIndex = startIndex;
+    for (let i = startIndex; i >= 0; i--) {
+      if (this.encodedChunks[i].type === "key") {
+        actualStartIndex = i;
+        break;
+      }
+    }
+
+    for (let i = actualStartIndex; i <= endIndex; i++) {
       this.decodeChunkAt(i);
     }
   }
@@ -306,6 +331,20 @@ export class FrameDecoder {
     this.decoderQueue.get(frame.timestamp)?.resolve();
     this.decoderQueue.delete(frame.timestamp);
 
+    // Add frame to buffer
+    if (!this.frameBuffer.has(frame.timestamp)) {
+      this.frameBuffer.set(frame.timestamp, frame);
+    } else {
+      frame.close();
+      return;
+    }
+
+    // Only clean up old frames if we have more than a reasonable amount
+    // For short videos, keep all frames
+    if (this.frameBuffer.size <= 1000) {
+      return;
+    }
+
     // Make sure we don't remove frames that could be needed for playback
     const lowerBound = this.currentTimestamp - BUFFER_RANGE;
     const upperBound = this.currentTimestamp + BUFFER_RANGE;
@@ -316,12 +355,6 @@ export class FrameDecoder {
         this.frameBuffer.delete(f.timestamp);
         f.close();
       }
-    }
-
-    if (!this.frameBuffer.has(frame.timestamp)) {
-      this.frameBuffer.set(frame.timestamp, frame);
-    } else {
-      frame.close();
     }
   }
 
@@ -335,7 +368,10 @@ export class FrameDecoder {
 
     const decoder = new VideoDecoder({
       output: this.frameCallback.bind(this),
-      error: this.onError ?? console.error,
+      error: (error) => {
+        console.error("VideoDecoder error:", error);
+        this.onError?.(error);
+      },
     });
 
     const input = new Input({
@@ -358,6 +394,7 @@ export class FrameDecoder {
 
     const config = await videoTrack.getDecoderConfig();
     if (!config) throw new Error("Failed to get decoder config");
+
     decoder.configure(config);
 
     this.encodedChunks = [];
@@ -370,13 +407,22 @@ export class FrameDecoder {
     for await (const packet of sink.packets()) {
       const chunk = packet.toEncodedVideoChunk();
       this.encodedChunks.push(chunk);
+    }
 
-      // Decode initial frames for fast painting
-      if (chunk.timestamp <= BUFFER_RANGE) {
-        this.decodeChunkAt(this.forwardIndex);
-        this.forwardIndex++;
+    // For short videos (< 30 frames), decode all frames
+    // For longer videos, decode initial buffer range
+    const shouldDecodeAll = true;
+
+    for (let i = 0; i < this.encodedChunks.length; i++) {
+      const chunk = this.encodedChunks[i];
+      if (shouldDecodeAll || chunk.timestamp <= BUFFER_RANGE) {
+        this.decodeChunkAt(i);
+        this.forwardIndex = i;
       }
     }
+
+    // // Flush the decoder to process all queued frames
+    await decoder.flush();
 
     this.loading = false;
   }
