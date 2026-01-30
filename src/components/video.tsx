@@ -16,13 +16,13 @@ function DeckGLOverlay(props: MapboxOverlayProps) {
 const INITIAL_VIEW_STATE: ViewState = {
   longitude: -40,
   latitude: 20,
-  zoom: 3,
+  zoom: 1,
   pitch: 0,
   bearing: 0,
   padding: { top: 0, bottom: 0, left: 0, right: 0 },
 };
 
-const TOTAL_FRAMES = 60;
+const TOTAL_FRAMES = 182;
 
 type TileData = {
   decoder: FrameDecoder;
@@ -34,17 +34,20 @@ export const MapVideoContainer = () => {
 
   useInterval(() => {
     setFrame((prevFrame) => (prevFrame + 1) % TOTAL_FRAMES);
-  }, 100);
+  }, 25);
 
   const LAYERS = useMemo(() => {
     return [
       new TileLayer<TileData | undefined, { frame: number }>({
         id: "video-tiles",
-        data: "http://localhost:8000/video_tile/WebMercatorQuad/{z}/{x}/{y}.mp4?url=https://atlantis-vis-o.s3-ext.jc.rl.ac.uk/nemotest101/T1d/sos_abs.zarr&variable=sos_abs&sel_method=nearest&colormap_name=jet&rescale=30,37&sel=time_counter=2000-01-01&sel=time_counter=2000-01-02&sel=time_counter=2000-01-03&sel=time_counter=2000-01-04&sel=time_counter=2000-01-05&sel=time_counter=2000-01-06&sel=time_counter=2000-01-07&sel=time_counter=2000-01-08&sel=time_counter=2000-01-09&sel=time_counter=2000-01-10&sel=time_counter=2000-01-11&sel=time_counter=2000-01-12&sel=time_counter=2000-01-13&sel=time_counter=2000-01-14&sel=time_counter=2000-01-15&sel=time_counter=2000-01-16&sel=time_counter=2000-01-17&sel=time_counter=2000-01-18&sel=time_counter=2000-01-19&sel=time_counter=2000-01-20&sel=time_counter=2000-01-21&sel=time_counter=2000-01-22&sel=time_counter=2000-01-23&sel=time_counter=2000-01-24&sel=time_counter=2000-01-25&sel=time_counter=2000-01-26&sel=time_counter=2000-01-27&sel=time_counter=2000-01-28&sel=time_counter=2000-01-29&sel=time_counter=2000-01-30&sel=time_counter=2000-01-31&sel=time_counter=2000-02-01&sel=time_counter=2000-02-02&sel=time_counter=2000-02-03&sel=time_counter=2000-02-04&sel=time_counter=2000-02-05&sel=time_counter=2000-02-06&sel=time_counter=2000-02-07&sel=time_counter=2000-02-08&sel=time_counter=2000-02-09&sel=time_counter=2000-02-10&sel=time_counter=2000-02-11&sel=time_counter=2000-02-12&sel=time_counter=2000-02-13&sel=time_counter=2000-02-14&sel=time_counter=2000-02-15&sel=time_counter=2000-02-16&sel=time_counter=2000-02-17&sel=time_counter=2000-02-18&sel=time_counter=2000-02-19&sel=time_counter=2000-02-20&sel=time_counter=2000-02-21&sel=time_counter=2000-02-22&sel=time_counter=2000-02-23&sel=time_counter=2000-02-24&sel=time_counter=2000-02-25&sel=time_counter=2000-02-26&sel=time_counter=2000-02-27&sel=time_counter=2000-02-28&sel=time_counter=2000-02-29",
+        // data: "http://localhost:8000/video_tile/WebMercatorQuad/{z}/{x}/{y}.webm?url=https://atlantis-vis-o.s3-ext.jc.rl.ac.uk/nemotest101/T1d/sos_abs.zarr&variable=sos_abs&sel_method=nearest&colormap_name=jet&rescale=30,37&sel=time_counter=2000-01-01&sel=time_counter=2000-01-02&sel=time_counter=2000-01-03&sel=time_counter=2000-01-04&sel=time_counter=2000-01-05&sel=time_counter=2000-01-06&sel=time_counter=2000-01-07&sel=time_counter=2000-01-08&sel=time_counter=2000-01-09&sel=time_counter=2000-01-10&sel=time_counter=2000-01-11&sel=time_counter=2000-01-12&sel=time_counter=2000-01-13&sel=time_counter=2000-01-14&sel=time_counter=2000-01-15&sel=time_counter=2000-01-16&sel=time_counter=2000-01-17&sel=time_counter=2000-01-18&sel=time_counter=2000-01-19&sel=time_counter=2000-01-20&sel=time_counter=2000-01-21&sel=time_counter=2000-01-22&sel=time_counter=2000-01-23&sel=time_counter=2000-01-24&sel=time_counter=2000-01-25&sel=time_counter=2000-01-26&sel=time_counter=2000-01-27&sel=time_counter=2000-01-28&sel=time_counter=2000-01-29&sel=time_counter=2000-01-30&sel=time_counter=2000-01-31&sel=time_counter=2000-02-01&sel=time_counter=2000-02-02&sel=time_counter=2000-02-03&sel=time_counter=2000-02-04&sel=time_counter=2000-02-05&sel=time_counter=2000-02-06&sel=time_counter=2000-02-07&sel=time_counter=2000-02-08&sel=time_counter=2000-02-09&sel=time_counter=2000-02-10&sel=time_counter=2000-02-11&sel=time_counter=2000-02-12&sel=time_counter=2000-02-13&sel=time_counter=2000-02-14&sel=time_counter=2000-02-15&sel=time_counter=2000-02-16&sel=time_counter=2000-02-17&sel=time_counter=2000-02-18&sel=time_counter=2000-02-19&sel=time_counter=2000-02-20&sel=time_counter=2000-02-21&sel=time_counter=2000-02-22&sel=time_counter=2000-02-23&sel=time_counter=2000-02-24&sel=time_counter=2000-02-25&sel=time_counter=2000-02-26&sel=time_counter=2000-02-27&sel=time_counter=2000-02-28&sel=time_counter=2000-02-29&sel=time_counter=2000-03-01&sel=time_counter=2000-03-02&sel=time_counter=2000-03-03&sel=time_counter=2000-03-04&sel=time_counter=2000-03-05&sel=time_counter=2000-03-06&sel=time_counter=2000-03-07&sel=time_counter=2000-03-08&sel=time_counter=2000-03-09&sel=time_counter=2000-03-10&sel=time_counter=2000-03-11&sel=time_counter=2000-03-12&sel=time_counter=2000-03-13&sel=time_counter=2000-03-14&sel=time_counter=2000-03-15&sel=time_counter=2000-03-16&sel=time_counter=2000-03-17&sel=time_counter=2000-03-18&sel=time_counter=2000-03-19&sel=time_counter=2000-03-20&sel=time_counter=2000-03-21&sel=time_counter=2000-03-22&sel=time_counter=2000-03-23&sel=time_counter=2000-03-24&sel=time_counter=2000-03-25&sel=time_counter=2000-03-26&sel=time_counter=2000-03-27&sel=time_counter=2000-03-28&sel=time_counter=2000-03-29&sel=time_counter=2000-03-30&sel=time_counter=2000-03-31&sel=time_counter=2000-04-01&sel=time_counter=2000-04-02&sel=time_counter=2000-04-03&sel=time_counter=2000-04-04&sel=time_counter=2000-04-05&sel=time_counter=2000-04-06&sel=time_counter=2000-04-07&sel=time_counter=2000-04-08&sel=time_counter=2000-04-09",
+        // data: "https://storage.googleapis.com/skydipper_materials/movie-tiles/EVI_TEST/{z}/{x}/{y}.mp4",
+        data: "http://localhost:5173/public/sos_abs_webm/{z}/{x}/{y}.webm",
         tileSize: 256,
         minZoom: 0,
-        maxZoom: 7,
+        maxZoom: 5,
         frame: frame,
+        // maxCacheSize: 0, // Disable deck.gl tile cache
         getTileData: async (props) => {
           if (!props.url) return undefined;
 
@@ -59,6 +62,27 @@ export const MapVideoContainer = () => {
 
           return { decoder: frameDecoder, canvas };
         },
+        // onTileUnload: async (tile) => {
+        //   console.log("Unloading tile", tile);
+        //   if (!tile) return;
+
+        //   if (tile.parent?.data) {
+        //     console.log("Unloading tile parent data", tile.parent.data);
+        //     const d = tile.parent.data;
+        //     d.decoder.destroy();
+        //     return;
+        //   }
+
+        //   if (tile.children && !!tile.children.length) {
+        //     for (const child of tile.children) {
+        //       if (child.data) {
+        //         console.log("Unloading tile child data", child.data);
+        //         const d = child.data;
+        //         d.decoder.destroy();
+        //       }
+        //     }
+        //   }
+        // },
 
         renderSubLayers: (props) => {
           if (!props) return null;

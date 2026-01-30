@@ -96,7 +96,7 @@ export class FrameDecoder {
 
     // Draw to internal canvas
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    this.ctx.drawImage(frame, 0, 0, frame.codedWidth, frame.codedHeight);
+    this.ctx.drawImage(frame, 0, 0, this.canvas.width, this.canvas.height);
 
     // Draw to target canvas
     ctx.drawImage(this.canvas, 0, 0, width, height);
