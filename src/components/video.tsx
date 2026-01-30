@@ -26,7 +26,6 @@ const TOTAL_FRAMES = 182;
 
 type TileData = {
   decoder: FrameDecoder;
-  canvas: HTMLCanvasElement;
 };
 
 // Custom refinement strategy that destroys decoders for non-visible tiles
@@ -69,12 +68,7 @@ export const MapVideoContainer = () => {
           const frameDecoder = new FrameDecoder();
           await frameDecoder.init(props.url);
 
-          // Create canvas for this tile
-          const canvas = document.createElement("canvas");
-          canvas.width = 256;
-          canvas.height = 256;
-
-          return { decoder: frameDecoder, canvas };
+          return { decoder: frameDecoder };
         },
         onTileUnload: async (tile) => {
           if (!tile.data) return;
@@ -105,8 +99,8 @@ export const MapVideoContainer = () => {
 
           // Create a new canvas for this frame to get a new object reference
           const canvas = document.createElement("canvas");
-          canvas.width = 256;
-          canvas.height = 256;
+          canvas.width = props.tileSize ?? 256;
+          canvas.height = props.tileSize ?? 256;
           const ctx = canvas.getContext("2d");
 
           if (!ctx) {
