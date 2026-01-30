@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import Map, { useControl, type ViewState } from "react-map-gl/maplibre";
-import { TileLayer, BitmapLayer } from "deck.gl";
+import { TileLayer, BitmapLayer, _Tileset2D } from "deck.gl";
 import { MapboxOverlay, type MapboxOverlayProps } from "@deck.gl/mapbox";
 
 import { useInterval } from "usehooks-ts";
@@ -29,12 +29,24 @@ type TileData = {
   canvas: HTMLCanvasElement;
 };
 
+// Custom refinement strategy that destroys decoders for non-visible tiles
+const customRefinementStrategy = (tiles: _Tileset2D["tiles"]) => {
+  for (const tile of tiles) {
+    if (!tile.isVisible) {
+      if (tile.data && "decoder" in tile.data) {
+        const { decoder } = tile.data;
+        decoder.destroy();
+      }
+    }
+  }
+};
+
 export const MapVideoContainer = () => {
   const [frame, setFrame] = useState(0);
 
   useInterval(() => {
     setFrame((prevFrame) => (prevFrame + 1) % TOTAL_FRAMES);
-  }, 25);
+  }, 50);
 
   const LAYERS = useMemo(() => {
     return [
@@ -47,7 +59,9 @@ export const MapVideoContainer = () => {
         minZoom: 0,
         maxZoom: 5,
         frame: frame,
-        // maxCacheSize: 0, // Disable deck.gl tile cache
+        debounceTime: 200,
+        maxCacheSize: 0, // Disable deck.gl tile cache
+        refinementStrategy: customRefinementStrategy,
         getTileData: async (props) => {
           if (!props.url) return undefined;
 
@@ -62,30 +76,21 @@ export const MapVideoContainer = () => {
 
           return { decoder: frameDecoder, canvas };
         },
-        // onTileUnload: async (tile) => {
-        //   console.log("Unloading tile", tile);
-        //   if (!tile) return;
+        onTileUnload: async (tile) => {
+          if (!tile.data) return;
 
-        //   if (tile.parent?.data) {
-        //     console.log("Unloading tile parent data", tile.parent.data);
-        //     const d = tile.parent.data;
-        //     d.decoder.destroy();
-        //     return;
-        //   }
-
-        //   if (tile.children && !!tile.children.length) {
-        //     for (const child of tile.children) {
-        //       if (child.data) {
-        //         console.log("Unloading tile child data", child.data);
-        //         const d = child.data;
-        //         d.decoder.destroy();
-        //       }
-        //     }
-        //   }
-        // },
+          if ("decoder" in tile.data) {
+            const { decoder } = tile.data;
+            decoder.destroy();
+          }
+        },
 
         renderSubLayers: (props) => {
           if (!props) return null;
+
+          if (!props.visible) {
+            console.log(props);
+          }
 
           const { boundingBox } = props.tile;
           const typedProps = props as typeof props & { frame: number };

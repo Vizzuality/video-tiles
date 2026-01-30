@@ -3,7 +3,7 @@ import { MapVideoContainer } from "./components/video";
 
 function App() {
   return (
-    <div className="w-full h-full bg-amber-500">
+    <div className="w-full h-full bg-gray-900">
       {/* <MapRasterContainer /> */}
       <MapVideoContainer />
     </div>
