@@ -2,7 +2,7 @@ import { EncodedPacketSink, Input, ALL_FORMATS, UrlSource } from "mediabunny";
 
 
 export class TileDecoder {
-  private _frames: ImageBitmap[] = [];
+  private _frames: VideoFrame[] = [];
   private _initPromise: Promise<void> | null = null;
   private _failed = false;
 
@@ -26,7 +26,7 @@ export class TileDecoder {
     });
   }
 
-  getFrame(index: number): ImageBitmap | undefined {
+  getFrame(index: number): VideoFrame | undefined {
     return this._frames[index];
   }
 
@@ -63,7 +63,6 @@ export class TileDecoder {
 
     frames.sort((a, b) => a.timestamp - b.timestamp);
 
-    this._frames = await Promise.all(frames.map((f) => createImageBitmap(f)));
-    for (const frame of frames) frame.close();
+    this._frames = frames;
   }
 }

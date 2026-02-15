@@ -4,6 +4,34 @@ import { Texture } from "./maplibre-texture";
 import { TileDecoder } from "./tile-decoder";
 
 
+function uploadVideoFrame(
+  context: any,
+  texture: Texture,
+  frame: VideoFrame,
+): void {
+  const gl = context.gl as WebGL2RenderingContext;
+  gl.bindTexture(gl.TEXTURE_2D, texture.texture);
+
+  context.pixelStoreUnpackFlipY.set(false);
+  context.pixelStoreUnpack.set(1);
+  context.pixelStoreUnpackPremultiplyAlpha.set(true);
+
+  const w = frame.displayWidth;
+  const h = frame.displayHeight;
+  const needsResize = !texture.size || texture.size[0] !== w || texture.size[1] !== h;
+
+  if (needsResize) {
+    texture.size = [w, h];
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, frame);
+  } else {
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, frame);
+  }
+
+  context.pixelStoreUnpackFlipY.setDefault();
+  context.pixelStoreUnpack.setDefault();
+  context.pixelStoreUnpackPremultiplyAlpha.setDefault();
+}
+
 export class VideoTileSource extends RasterTileSource implements Source {
   private _currentFrame = 0;
   private _frameDirty = false;
@@ -19,8 +47,6 @@ export class VideoTileSource extends RasterTileSource implements Source {
     const { z, x, y } = tile.tileID.canonical;
     const canonicalKey = `${z}/${x}/${y}`;
 
-    tile.abortController = new AbortController();
-
     let decoder = this._decoders.get(canonicalKey);
     if (!decoder) {
       const url = tile.tileID.canonical.url(this.tiles, this.map.getPixelRatio(), this.scheme);
@@ -33,26 +59,30 @@ export class VideoTileSource extends RasterTileSource implements Source {
     try {
       await decoder.ready;
 
-      if (tile.aborted || tile.abortController?.signal.aborted) return;
-      if (decoder.failed) {
-        tile.state = "errored";
+      if (tile.aborted) {
+        tile.state = "unloaded"
         return;
       }
 
-      const bitmap = decoder.getFrame(this._currentFrame);
-      if (!bitmap) {
+      const frame = decoder.getFrame(this._currentFrame);
+      if (!frame) {
         tile.state = "errored";
         return;
       }
 
       const context = this.map.painter.context;
       const gl = context.gl;
-      tile.texture = this.map.painter.getTileTexture(bitmap.width);
-      if (tile.texture) {
-        tile.texture.update(bitmap, { useMipmap: false });
-      } else {
-        tile.texture = new Texture(context, bitmap, gl.RGBA, { useMipmap: false });
+      tile.texture = this.map.painter.getTileTexture(frame.displayWidth);
+      if (!tile.texture) {
+        tile.texture = new Texture(
+          context,
+          { width: frame.displayWidth, height: frame.displayHeight, data: null } as any,
+          gl.RGBA,
+          { useMipmap: false },
+        );
       }
+      uploadVideoFrame(context, tile.texture, frame);
+
       // MapLibre's draw_raster always binds with LINEAR_MIPMAP_NEAREST, but
       // video textures never have mipmaps generated. Override bind to force
       // a non-mipmap min filter, preventing "incomplete texture" warnings.
@@ -77,16 +107,17 @@ export class VideoTileSource extends RasterTileSource implements Source {
   prepare(): void {
     if (!this._frameDirty) return;
 
+    const context = this.map.painter.context;
     for (const tile of this._loadedTiles) {
       if (!tile.texture) continue;
 
       const { z, x, y } = tile.tileID.canonical;
       const decoder = this._decoders.get(`${z}/${x}/${y}`);
-      if (!decoder || decoder.failed) continue;
-      const bitmap = decoder.getFrame(this._currentFrame);
-      if (!bitmap) continue;
+      if (!decoder) continue;
+      const frame = decoder.getFrame(this._currentFrame);
+      if (!frame) continue;
 
-      tile.texture.update(bitmap, { useMipmap: false });
+      uploadVideoFrame(context, tile.texture, frame);
     }
 
     this._frameDirty = false;

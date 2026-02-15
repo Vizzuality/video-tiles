@@ -99,6 +99,7 @@ export const MapVideoMaplibre = ({ frame }: MapVideoMaplibreProps) => {
       initialViewState={INITIAL_VIEW_STATE}
       mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
       projection="globe"
+      maxTileCacheSize={0} 
     >
       <VideoFrameUpdater frame={frame} />
     </Map>
