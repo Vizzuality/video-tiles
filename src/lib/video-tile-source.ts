@@ -1,7 +1,8 @@
 import { RasterTileSource } from "maplibre-gl";
-import type { Source } from "maplibre-gl";
+import type { Source, Tile } from "maplibre-gl";
 import { Texture } from "./maplibre-texture";
 import { TileDecoder } from "./tile-decoder";
+import { decodeQueue } from "./decode-queue";
 
 
 function uploadVideoFrame(
@@ -50,20 +51,19 @@ export class VideoTileSource extends RasterTileSource implements Source {
     let decoder = this._decoders.get(canonicalKey);
     if (!decoder) {
       const url = tile.tileID.canonical.url(this.tiles, this.map.getPixelRatio(), this.scheme);
-  
+
       decoder = new TileDecoder();
-      decoder.init(url);
       this._decoders.set(canonicalKey, decoder);
+
+      await decodeQueue.enqueue(() => decoder!.init(url));
+    }
+
+    if (tile.aborted) {
+      tile.state = "unloaded";
+      return;
     }
 
     try {
-      await decoder.ready;
-
-      if (tile.aborted) {
-        tile.state = "unloaded"
-        return;
-      }
-
       const frame = decoder.getFrame(this._currentFrame);
       if (!frame) {
         tile.state = "errored";
@@ -142,6 +142,18 @@ export class VideoTileSource extends RasterTileSource implements Source {
     }
 
     super.unloadTile(tile);
+  }
+
+  async abortTile(tile: Tile): Promise<void> {
+    const { z, x, y } = tile.tileID.canonical;
+    const canonicalKey = `${z}/${x}/${y}`;
+    
+    this._loadedTiles.delete(tile);
+    const decoder = this._decoders.get(canonicalKey);
+    if (decoder) {
+      decoder.destroy();
+      this._decoders.delete(canonicalKey);
+    }
   }
 
   onRemove(): void {

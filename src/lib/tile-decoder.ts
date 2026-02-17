@@ -1,29 +1,25 @@
 import { EncodedPacketSink, Input, ALL_FORMATS, UrlSource } from "mediabunny";
 
-
 export class TileDecoder {
   private _frames: VideoFrame[] = [];
-  private _initPromise: Promise<void> | null = null;
+  private _initialized = false;
   private _failed = false;
+  private _destroyed = false;
+  private _input: Input | null = null;
+  private _abortController: AbortController | null = null;
 
   get failed(): boolean {
     return this._failed;
-  }
-
-  get ready(): Promise<void> {
-    return this._initPromise ?? Promise.resolve();
   }
 
   get frameCount(): number {
     return this._frames.length;
   }
 
-  init(url: string): void {
-    if (this._initPromise) return;
-    this._initPromise = this._decode(url).catch((err) => {
-      console.error("Failed to decode:", err);
-      this._failed = true;
-    });
+  async init(url: string): Promise<void> {
+    if (this._initialized || this._destroyed) return;
+    this._initialized = true;
+    await this._decode(url);
   }
 
   getFrame(index: number): VideoFrame | undefined {
@@ -31,15 +27,23 @@ export class TileDecoder {
   }
 
   destroy(): void {
+    this._destroyed = true;
+    this._abortController?.abort();
     for (const frame of this._frames) frame.close();
     this._frames = [];
   }
 
   private async _decode(url: string): Promise<void> {
+    const abortController = new AbortController();
+    this._abortController = abortController;
+    const { signal } = abortController;
+
     const frames: VideoFrame[] = [];
+    let decoderError: DOMException | null = null;
+
     const decoder = new VideoDecoder({
-      output: (frame) => frames.push(frame),
-      error: (e) => console.error("Decode error:", e),
+      output: (frame) => { frames.push(frame) },
+      error: (e) => { decoderError = e },
     });
 
     const input = new Input({
@@ -47,22 +51,34 @@ export class TileDecoder {
       formats: ALL_FORMATS,
     });
 
-    const videoTrack = await input.getPrimaryVideoTrack();
-    if (!videoTrack) throw new Error("No video track found");
-    const config = await videoTrack.getDecoderConfig();
-    if (!config) throw new Error("Failed to get decoder config");
+    try {
+      const videoTrack = await input.getPrimaryVideoTrack();
+      if (!videoTrack) throw new Error("No video track found");
 
-    decoder.configure(config);
+      const config = await videoTrack.getDecoderConfig();
+      if (!config) throw new Error("Failed to get decoder config");
 
-    const sink = new EncodedPacketSink(videoTrack);
-    for await (const packet of sink.packets()) {
-      decoder.decode(packet.toEncodedVideoChunk());
+      decoder.configure(config);
+      const sink = new EncodedPacketSink(videoTrack);
+      for await (const packet of sink.packets()) {
+        signal.throwIfAborted();
+        decoder.decode(packet.toEncodedVideoChunk());
+      }
+
+      await decoder.flush();
+      if (decoderError) throw decoderError;
+      signal.throwIfAborted();
+
+      frames.sort((a, b) => a.timestamp - b.timestamp);
+      this._frames = frames;
+    } catch (err) {
+      for (const frame of frames) frame.close();
+      if (this._destroyed) return;
+
+      console.error("Failed to decode:", err);
+      this._failed = true;
+    } finally {
+      decoder.close();
     }
-    await decoder.flush();
-    decoder.close();
-
-    frames.sort((a, b) => a.timestamp - b.timestamp);
-
-    this._frames = frames;
   }
 }
