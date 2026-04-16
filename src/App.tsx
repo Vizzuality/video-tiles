@@ -1,6 +1,5 @@
 import { useState } from "react";
-// import { MapRasterContainer } from "./components/raster";
-import { MapVideoContainer } from "./components/video";
+import { MapVideoMaplibre } from "./components/video-maplibre";
 import { Slider } from "./components/ui/slider";
 import { useInterval } from "usehooks-ts";
 
@@ -24,8 +23,7 @@ function App() {
 
   return (
     <div className="w-full h-full bg-gray-900 relative">
-      {/* <MapRasterContainer /> */}
-      <MapVideoContainer frame={frame} />
+      <MapVideoMaplibre frame={frame} />
 
       <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 w-96 bg-gray-800 p-4 rounded-lg shadow-lg">
         <div className="flex items-center gap-4">
