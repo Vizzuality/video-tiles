@@ -5,7 +5,6 @@ export class TileDecoder {
   private _initialized = false;
   private _failed = false;
   private _destroyed = false;
-  private _input: Input | null = null;
   private _abortController: AbortController | null = null;
 
   get failed(): boolean {
